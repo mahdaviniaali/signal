@@ -12,6 +12,7 @@ from threading import Lock
 class TopicMetrics:
     processed: int = 0
     failed: int = 0
+    duplicates: int = 0
     first_at: float | None = None
     last_at: float | None = None
     _lock: Lock = field(default_factory=Lock, repr=False)
@@ -28,6 +29,10 @@ class TopicMetrics:
         with self._lock:
             self.failed += 1
 
+    def record_duplicate(self) -> None:
+        with self._lock:
+            self.duplicates += 1
+
     def snapshot(self) -> dict:
         with self._lock:
             if self.first_at is None or self.last_at is None or self.processed == 0:
@@ -39,6 +44,7 @@ class TopicMetrics:
             return {
                 "processed": self.processed,
                 "failed": self.failed,
+                "duplicates": self.duplicates,
                 "rate_per_sec": round(rate, 2),
                 "elapsed_sec": round(elapsed, 2),
             }

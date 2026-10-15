@@ -24,5 +24,8 @@ class Settings(BaseSettings):
     shutdown_timeout_seconds: float = 30.0
     failure_backoff_seconds: float = 0.5
 
+    # Shared SQLite file for idempotent order/event deduplication across workers.
+    idempotency_db_path: str = "data/processed_events.db"
+
 
 settings = Settings()

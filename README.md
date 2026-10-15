@@ -15,6 +15,7 @@ FastAPI service that consumes two Kafka topics with **5 uvicorn workers**, keepi
 | Concurrent success | Commits advance only as a **contiguous watermark** per partition (out-of-order completion cannot skip failed/unprocessed offsets). |
 | Worker stop | Consumer loop stops fetching; in-flight tasks drain (with timeout); only successfully processed contiguous offsets are committed; Kafka reassigns partitions to remaining workers. |
 | Backpressure | Per-worker semaphore limits in-flight messages; consumer **pauses** when saturated and **resumes** when capacity frees — no unbounded pending queue. |
+| Redelivery after crash (e.g. order `101`) | Before saving, the worker checks SQLite (`UNIQUE(topic, event_id)`). If the order was already saved, it **skips** insert, increments `duplicates`, and still commits the Kafka offset. |
 
 ## Prerequisites
 
@@ -63,6 +64,14 @@ Sustained load helper:
 python scripts/load_test.py --io-count 500 --cpu-count 50
 ```
 
+Idempotency demo (same order id delivered twice — second insert must not happen):
+
+```bash
+python scripts/demo_idempotency.py --event-id 101
+curl http://127.0.0.1:8000/events/io-heavy-events/101
+curl http://127.0.0.1:8000/metrics   # look at "duplicates"
+```
+
 ## Configuration
 
 Environment variables (defaults in `app/config.py`):
@@ -73,7 +82,12 @@ Environment variables (defaults in `app/config.py`):
 - `IO_LATENCY_SECONDS` (default `0.1`)
 - `CPU_WORK_ITERATIONS` (default `200000`)
 - `PROCESS_POOL_WORKERS` (default `2`)
+- `IDEMPOTENCY_DB_PATH` (default `data/processed_events.db`)
 
 ## Load report
 
 See [docs/load_report.md](docs/load_report.md) for throughput notes and CPU-vs-I/O isolation observations.
+
+## Decision report
+
+مسیر فکری و دلیل تصمیم‌های مهم (۵ worker، جداسازی I/O/CPU، commit امن، idempotency سفارش ۱۰۱ و …) در [docs/decision_report.md](docs/decision_report.md) ثبت شده است.

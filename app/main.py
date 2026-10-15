@@ -6,11 +6,12 @@ import logging
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from app.config import settings
 from app.consumers import CpuConsumer, IoConsumer
 from app.metrics import metrics
+from app.store import store
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,3 +57,17 @@ async def health():
 @app.get("/metrics")
 async def get_metrics():
     return metrics.snapshot()
+
+
+@app.get("/events/{topic}/{event_id}")
+async def get_event(topic: str, event_id: str):
+    """Look up a saved order/event (for verifying idempotent storage)."""
+    row = store.get(topic, event_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="event not found")
+    return row
+
+
+@app.get("/events/count")
+async def events_count(topic: str | None = None):
+    return {"topic": topic, "count": store.count(topic)}
